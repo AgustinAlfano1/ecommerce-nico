@@ -3,6 +3,7 @@
 import { useCart } from "../../src/context/CartContext";
 import { useState } from "react";
 import { createOrder } from "../../src/services/orderService";
+import { createPreference } from "../../src/services/paymentService";
 
 export default function CheckoutPage() {
   const { cart, totalPrice, clearCart } = useCart();
@@ -21,24 +22,40 @@ export default function CheckoutPage() {
       return;
     }
 
+    const payload = {
+      customer: { name, email },
+      items: cart.map((i: any) => ({
+        productId: i._id,
+        name: i.name,
+        price: i.price,
+        qty: i.qty,
+      })),
+      total: cart.reduce((acc: number, i: any) => acc + i.price * i.qty, 0),
+    };
+
+    let orderId = "";
+
+    // 1) Crear orden (esto debe pasar siempre)
     try {
-      const payload = {
-        customer: { name, email },
-        items: cart.map((i: any) => ({
-          productId: i._id,
-          name: i.name,
-          price: i.price,
-          qty: i.qty,
-        })),
-        total: cart.reduce((acc: number, i: any) => acc + i.price * i.qty, 0),
-      };
-
       const result = await createOrder(payload);
+      orderId = result.orderId;
 
-      alert(`Orden creada ✅ ID: ${result.orderId}`);
-      clearCart();
+      alert(`Orden creada ✅ ID: ${orderId}`);
+      // NO limpiamos carrito todavía, lo hacemos cuando vuelva "success"
     } catch (e: any) {
       alert(e.message || "Error creando la orden");
+      return;
+    }
+
+    // 2) Crear preferencia MP (si falla, la orden igual quedó creada)
+    try {
+      const pref = await createPreference(orderId);
+      window.location.href = pref.init_point; // test
+    } catch (e: any) {
+      alert(
+        (e.message || "Error creando preferencia") +
+          `\n\nLa orden quedó creada igual: ${orderId}`,
+      );
     }
   };
 
